@@ -298,7 +298,7 @@ bool Board::messageDecodeCommon(uint32_t canId, uint8_t data[8], uint8_t deviceN
 	case COMMAND_REPORT_ALIVE:
 		if (_aliveReport)
 			print("%s alive.\n\r", name(deviceNumber));
-		aliveSet(true, deviceNumber);
+		aliveSet(true, deviceNumber); 
 		break;
 	default:
 		found = false;
@@ -438,7 +438,7 @@ void Board::reset(uint8_t deviceNumber) {
 @param measuringModeNow - Measuring mode id. Default 0.
 @param refreshMs - gap between 2 CAN Bus messages to refresh local Arduino copy of device's data. 0 - device's default.
 */
-void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refreshMs) {
+void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refreshMs) { 
 	if (deviceNumber == 0xFF)
 		for (uint8_t i = 0; i < nextFree; i++)
 			start(i, measuringModeNow, refreshMs);
@@ -460,7 +460,6 @@ void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refre
 				canData[2] = (refreshMs >> 8) & 0xFF;
 			}
 			messageSend(canData, refreshMs == 0 ? 1 : 3, deviceNumber);
-			//robotContainer->mrm_can_bus->messageSend((*idIn)[deviceNumber], refreshMs == 0 ? 1 : 3, canData);
 #endif
 		}
 	}

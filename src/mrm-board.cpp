@@ -277,7 +277,7 @@ bool Board::messageDecodeCommon(uint32_t canId, uint8_t data[8], uint8_t deviceN
 		(*fpsLast)[deviceNumber] = (data[2] << 8) | data[1];
 		break;
 	case COMMAND_MESSAGE_SENDING_1:
-		for (uint8_t i = 0; i < 7; i++) 
+		for (uint8_t i = 0; i < 7; i++)
 			_message[i] = data[i + 1];
 		break;
 	case COMMAND_MESSAGE_SENDING_2:
@@ -298,7 +298,7 @@ bool Board::messageDecodeCommon(uint32_t canId, uint8_t data[8], uint8_t deviceN
 	case COMMAND_REPORT_ALIVE:
 		if (_aliveReport)
 			print("%s alive.\n\r", name(deviceNumber));
-		aliveSet(true, deviceNumber); 
+		aliveSet(true, deviceNumber);
 		break;
 	default:
 		found = false;
@@ -438,7 +438,7 @@ void Board::reset(uint8_t deviceNumber) {
 @param measuringModeNow - Measuring mode id. Default 0.
 @param refreshMs - gap between 2 CAN Bus messages to refresh local Arduino copy of device's data. 0 - device's default.
 */
-void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refreshMs) { 
+void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refreshMs) {
 	if (deviceNumber == 0xFF)
 		for (uint8_t i = 0; i < nextFree; i++)
 			start(i, measuringModeNow, refreshMs);
@@ -519,7 +519,7 @@ MotorBoard::MotorBoard(Robot* robot, uint8_t devicesOnABoard, const char* boardN
 @param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
 */
 void MotorBoard::directionChange(uint8_t deviceNumber) {
-	if (deviceNumber >= nextFree) 
+	if (deviceNumber >= nextFree)
 		strcpy(errorMessage, "Wrong device");
 	else
 		(*reversed)[deviceNumber] = !(*reversed)[deviceNumber];
@@ -538,6 +538,7 @@ bool MotorBoard::messageDecode(uint32_t canId, uint8_t data[8]) {
 				case COMMAND_SENSORS_MEASURE_SENDING: {
 					uint32_t enc = (data[4] << 24) | (data[3] << 16) | (data[2] << 8) | data[1];
 					(*encoderCount)[deviceNumber] = enc;
+					(*_lastReadingMs)[deviceNumber] = millis();
 					break;
 				}
 				default:
@@ -562,7 +563,11 @@ uint16_t MotorBoard::reading(uint8_t deviceNumber) {
 		strcpy(errorMessage, "MotorBoard doesn't exist");
 		return 0;
 	}
-	return (*encoderCount)[deviceNumber];
+	alive(deviceNumber, true);
+	if (started(deviceNumber))
+		return (*encoderCount)[deviceNumber];
+	else
+		return 0;
 }
 
 /** Print all readings in a line
@@ -597,6 +602,32 @@ void MotorBoard::speedSet(uint8_t motorNumber, int8_t speed) {
 	messageSend(canData, 2, motorNumber);
 }
 
+/** If sensor not started, start it and wait for 1. message
+@param deviceNumber - Device's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
+@return - started or not
+*/
+bool MotorBoard::started(uint8_t deviceNumber) {
+	if (millis() - (*_lastReadingMs)[deviceNumber] > MRM_MOTORS_INACTIVITY_ALLOWED_MS || (*_lastReadingMs)[deviceNumber] == 0) {
+		// print("Start mrm-bldc4x2.5%i \n\r", deviceNumber); 
+		for (uint8_t i = 0; i < 8; i++) { // 8 tries
+			start(deviceNumber, 0);
+			// Wait for 1. message.
+			uint32_t startMs = millis();
+			while (millis() - startMs < 50) {
+				if (millis() - (*_lastReadingMs)[deviceNumber] < 100) {
+					// print("BLDC confirmed\n\r");
+					return true;
+				}
+				robotContainer->delayMs(1);
+			}
+		}
+		strcpy(errorMessage, "mrm-bldc4x2.5 dead.\n\r");
+		return false;
+	}
+	else
+		return true;
+}
+
 /** Stop all motors
 */
 void MotorBoard::stop() {
@@ -624,7 +655,7 @@ void MotorBoard::test(uint8_t deviceNumber, uint16_t betweenTestsMs)
 	uint16_t selectedMotor = robotContainer->serialReadNumber(3000, 500, nextFree - 1 > 9, nextFree - 1, false);
 	if (selectedMotor == 0xFFFF)
 		print("Test all\n\r");
-	else 
+	else
 		print("\n\rTest motor %i\n\r", selectedMotor);
 
 	// Select speed
@@ -648,7 +679,7 @@ void MotorBoard::test(uint8_t deviceNumber, uint16_t betweenTestsMs)
 
 			if ((selectedMotor != 0xFFFF && motorNumber != selectedMotor) || !alive(motorNumber))
 				continue;
- 
+
 			if (!encodersStarted[motorNumber]) {
 				encodersStarted[motorNumber] = true;
 				canData[0] = COMMAND_SENSORS_MEASURE_CONTINUOUS;
@@ -706,7 +737,7 @@ void MotorBoard::test(uint8_t deviceNumber, uint16_t betweenTestsMs)
 @param maxNumberOfBoards - maximum number of boards
 @param id - unique id
 */
-SensorBoard::SensorBoard(Robot* robot, uint8_t devicesOnABoard, const char boardName[], uint8_t maxNumberOfBoards, BoardId id) : 
+SensorBoard::SensorBoard(Robot* robot, uint8_t devicesOnABoard, const char boardName[], uint8_t maxNumberOfBoards, BoardId id) :
 	Board(robot, maxNumberOfBoards, devicesOnABoard, boardName, SENSOR_BOARD, id) {
 }
 
@@ -790,7 +821,7 @@ int16_t MotorGroupDifferential::checkBounds(int16_t speed) {
 		return -127;
 	else if (speed > 127)
 		return 127;
-	else 
+	else
 		return speed;
 }
 
@@ -841,7 +872,7 @@ void MotorGroupDifferential::go(int16_t leftSpeed, int16_t rightSpeed, int16_t l
 @param motorNumberForMinus45Degrees - Controller's output number.
 */
 MotorGroupStar::MotorGroupStar(Robot* robot, MotorBoard* motorBoardFor45Degrees, uint8_t motorNumberFor45Degrees, MotorBoard* motorBoardFor135Degrees, uint8_t motorNumberFor135Degrees,
-	MotorBoard* motorBoardForMinus135Degrees, uint8_t motorNumberForMinus135Degrees, MotorBoard* motorBoardForMinus45Degrees, uint8_t motorNumberForMinus45Degrees) : MotorGroup(robot) {
+	MotorBoard* motorBoardForMinus135Degrees, uint8_t motorNumberForMinus135Degrees, MotorBoard* motorBoardForMinus45Degrees, uint8_t motorNumberForMinus45Degrees) : MotorGroup(robot){
 	motorBoard[0] = motorBoardFor45Degrees;
 	motorNumber[0] = motorNumberFor45Degrees;
 	motorBoard[1] = motorBoardFor135Degrees;
@@ -883,7 +914,7 @@ void MotorGroupStar::go(float speed, float angleDegrees, float rotation, uint8_t
 					maxSpeed = abs(speeds[i]);
 
 			//Serial.print("Rot err: " + (String)rotation + " ");
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < 4; i++){
 				if (maxSpeed > speedLimit) {
 					motorBoard[i]->speedSet(motorNumber[i], (int8_t)(speeds[i] / maxSpeed * speedLimit));
 					//Serial.print("MAX ");

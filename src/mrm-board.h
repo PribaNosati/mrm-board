@@ -54,9 +54,18 @@ enum BoardId{ID_MRM_8x8A, ID_ANY, ID_MRM_BLDC2X50, ID_MRM_BLDC4x2_5, ID_MRM_COL_
 	ID_MRM_IR_FINDER3, ID_MRM_IR_FINDER_CAN, ID_MRM_LID_CAN_B, ID_MRM_LID_CAN_B2, ID_MRM_MOT2X50, ID_MRM_MOT4X3_6CAN, ID_MRM_MOT4X10, 
 	ID_MRM_NODE, ID_MRM_REF_CAN, ID_MRM_SERVO, ID_MRM_SWITCH, ID_MRM_THERM_B_CAN, ID_MRM_US, ID_MRM_US_B, ID_MRM_US1};
 
-enum BoardType{MOTOR_BOARD, SENSOR_BOARD};
+enum BoardType{ANY_BOARD, MOTOR_BOARD, SENSOR_BOARD};
 
 class Robot;
+
+class Board;
+struct BoardInfo{
+	public:
+	Board * board;
+	uint8_t deviceNumber;
+	char name[12];
+	uint8_t readingsCount;
+};
 
 /** Board is a class of all the boards of the same type, not a single board!
 */
@@ -360,9 +369,9 @@ public:
 };
 
 
-
-
 class SensorBoard : public Board {
+private:
+	uint8_t _readingsCount; // Number of measurements, like 9 in a reflectance sensors with 9 transistors
 public:
 	/**
 	@param robot - robot containing this board
@@ -372,7 +381,8 @@ public:
 	@param maxNumberOfBoards - maximum number of boards
 	@param id - unique id
 	*/
-	SensorBoard(Robot* robot, uint8_t devicesOnABoard, const char* boardName, uint8_t maxNumberOfBoards, BoardId id);
+	SensorBoard(Robot* robot, uint8_t devicesOnABoard, const char* boardName, uint8_t maxNumberOfBoards, BoardId id,
+		uint8_t measurementsCount);
 
 	/** Starts periodical CANBus messages that will be refreshing values that mirror sensor's calculated values
 	@param deviceNumber - Device's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
@@ -385,6 +395,15 @@ public:
 	@return - true if canId for this class
 	*/
 	virtual bool messageDecode(uint32_t canId, uint8_t data[8]){return false;}
+
+	/** All readings
+	@param subsensorNumberInSensor - like a single IR transistor in mrm-ref-can
+	@param deviceNumber - Device's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
+	@return - analog value
+	*/
+	virtual uint16_t reading(uint8_t subsensorNumberInSensor, uint8_t deviceNumber = 0){ return 0;}
+
+	uint8_t readingsCount(){return _readingsCount;}
 };
 
 //typedef void (*SpeedSetFunction)(uint8_t motorNumber, int8_t speed);

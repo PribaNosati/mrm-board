@@ -88,7 +88,7 @@ bool Board::alive(uint8_t deviceNumber, bool checkAgainIfDead, bool errorIfNotAf
 				if (errorIfNotAfterCheckingAgain)
 					sprintf(errorMessage, "%s no. %i dead", name(), deviceNumber);
 				else
-					print("%s %i dead\n\r", name(), deviceNumber);
+					robotContainer->print("%s %i dead\n\r", name(), deviceNumber);
 				return false;
 			}
 		}
@@ -137,11 +137,11 @@ uint8_t Board::devicesScan(bool verbose, uint16_t mask) {
 			aliveSet(false, deviceNumber);
 			canData[0] = COMMAND_REPORT_ALIVE;
 			messageSend(canData, 1, deviceNumber);
-			// print("%s scanned\n\r", name(deviceNumber));
+			// robotContainer->print("%s scanned\n\r", name(deviceNumber));
 			robotContainer->delayMicros(500); // Exchange CAN Bus messages and receive possible answer, that sets _alive. 
 		}
 	}
-	//print("%s OVER\n\r", nameGroup);
+	//robotContainer->print("%s OVER\n\r", nameGroup);
 	return count();
 }
 
@@ -174,9 +174,9 @@ void Board::fpsDisplay() {
 	for (uint8_t deviceNumber = 0; deviceNumber < nextFree; deviceNumber++) {
 		if (alive(deviceNumber)){
 			if ((*fpsLast)[deviceNumber] == 0xFFFF)
-				print("%s: no response\n\r", (*_name)[deviceNumber]);
+				robotContainer->print("%s: no response\n\r", (*_name)[deviceNumber]);
 			else
-				print("%s: %i FPS\n\r", (*_name)[deviceNumber], fps(deviceNumber));
+				robotContainer->print("%s: %i FPS\n\r", (*_name)[deviceNumber], fps(deviceNumber));
 		}
 	}
 }
@@ -266,11 +266,11 @@ bool Board::messageDecodeCommon(uint32_t canId, uint8_t data[8], uint8_t deviceN
 	case COMMAND_ERROR:
 		errorCode = data[1];
 		errorInDeviceNumber = deviceNumber;
-		print("Error %i in %s.\n\r", errorCode, (*_name)[deviceNumber]);
+		robotContainer->print("Error %i in %s.\n\r", errorCode, (*_name)[deviceNumber]);
 		break;
 	case COMMAND_FIRMWARE_SENDING: {
 		uint16_t firmwareVersion = (data[2] << 8) | data[1];
-		print("%s: ver. %i \n\r", (*_name)[deviceNumber], firmwareVersion);
+		robotContainer->print("%s: ver. %i \n\r", (*_name)[deviceNumber], firmwareVersion);
 	}
 		break;
 	case COMMAND_FPS_SENDING:
@@ -291,13 +291,13 @@ bool Board::messageDecodeCommon(uint32_t canId, uint8_t data[8], uint8_t deviceN
 	case COMMAND_MESSAGE_SENDING_4:
 		for (uint8_t i = 0; i < 7; i++)
 			_message[21 + i] = data[i + 1];
-		print("Message from %s: %s\n\r", (*_name)[deviceNumber], _message);
+		robotContainer->print("Message from %s: %s\n\r", (*_name)[deviceNumber], _message);
 		break;
 	case COMMAND_NOTIFICATION:
 		break;
 	case COMMAND_REPORT_ALIVE:
 		if (_aliveReport)
-			print("%s alive.\n\r", name(deviceNumber));
+			robotContainer->print("%s alive.\n\r", name(deviceNumber));
 		aliveSet(true, deviceNumber);
 		break;
 	default:
@@ -329,23 +329,23 @@ bool Board::messagePrint(uint32_t msgId, uint8_t dlc, uint8_t* data, bool outbou
 	bool found = false;
 	for (uint8_t deviceNumber = 0; deviceNumber < nextFree; deviceNumber++)
 		if (isForMe(msgId, deviceNumber) || isFromMe(msgId, deviceNumber)) {
-			print("%s id:%s (0x%02X)", outbound ? "Out" : "In", (*_name)[deviceNumber], msgId);
+			robotContainer->print("%s id:%s (0x%02X)", outbound ? "Out" : "In", (*_name)[deviceNumber], msgId);
 			for (uint8_t i = 0; i < dlc; i++) {
 				if (i == 0)
-					print(" data:");
-				print(" %02X", data[i]);
+					robotContainer->print(" data:");
+				robotContainer->print(" %02X", data[i]);
 			}
-			print("\n\r");
+			robotContainer->print("\n\r");
 			found = true;
 		}
 	if (!found) {
-		print("%s id:0x%02X", outbound ? "Out" : "In", msgId);
+		robotContainer->print("%s id:0x%02X", outbound ? "Out" : "In", msgId);
 		for (uint8_t i = 0; i < dlc; i++) {
 			if (i == 0)
-				print(" data:");
-			print(" %02X", data[i]);
+				robotContainer->print(" data:");
+			robotContainer->print(" %02X", data[i]);
 		}
-		print("\n\r");
+		robotContainer->print("\n\r");
 	}
 	return found;
 }
@@ -394,7 +394,7 @@ void Board::notificationRequest(uint8_t commandRequestingNotification, uint8_t d
 	//		//print("RCVD id 0x%x, data: 0x%x\n\r", id, mrm_can_bus->dequeBack->data[0]);
 	//		if (isForMe(id, deviceNumber) && dequeBack()->data[0] == COMMAND_NOTIFICATION) {
 	//			tries = 0xFF;
-	//			//print("OK...\n\r");
+	//			//robotContainer->print("OK...\n\r");
 	//		}
 	//	}
 	//}
@@ -412,7 +412,7 @@ void Board::oscillatorTest(uint8_t deviceNumber) {
 			oscillatorTest(i);
 	else {
 		if (alive(deviceNumber)) {
-			print("Test %s\n\r", name(deviceNumber));
+			robotContainer->print("Test %s\n\r", name(deviceNumber));
 			canData[0] = COMMAND_OSCILLATOR_TEST;
 			messageSend(canData, 1, deviceNumber);
 		}
@@ -444,7 +444,7 @@ void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refre
 			start(i, measuringModeNow, refreshMs);
 	else {
 		if (alive(deviceNumber)) {
-			//print("Alive, start reading: %s, mode: %i\n\r", _boardsName, measuringModeNow);
+			//robotContainer->print("Alive, start reading: %s, mode: %i\n\r", _boardsName, measuringModeNow);
 #if REQUEST_NOTIFICATION
 			notificationRequest(COMMAND_SENSORS_MEASURE_CONTINUOUS_REQUEST_NOTIFICATION, deviceNumber);
 #else
@@ -542,7 +542,7 @@ bool MotorBoard::messageDecode(uint32_t canId, uint8_t data[8]) {
 					break;
 				}
 				default:
-					print("Unknown command. ");
+					robotContainer->print("Unknown command. ");
 					messagePrint(canId, 8, data, false);
 					errorCode = 200;
 					errorInDeviceNumber = deviceNumber;
@@ -573,10 +573,10 @@ uint16_t MotorBoard::reading(uint8_t deviceNumber) {
 /** Print all readings in a line
 */
 void MotorBoard::readingsPrint() {
-	print("Encoders:");
+	robotContainer->print("Encoders:");
 	for (uint8_t deviceNumber = 0; deviceNumber < nextFree; deviceNumber++)
 		if (alive(deviceNumber))
-			print(" %4i", (*encoderCount)[deviceNumber]);
+			robotContainer->print(" %4i", (*encoderCount)[deviceNumber]);
 }
 
 
@@ -608,14 +608,14 @@ void MotorBoard::speedSet(uint8_t motorNumber, int8_t speed) {
 */
 bool MotorBoard::started(uint8_t deviceNumber) {
 	if (millis() - (*_lastReadingMs)[deviceNumber] > MRM_MOTORS_INACTIVITY_ALLOWED_MS || (*_lastReadingMs)[deviceNumber] == 0) {
-		// print("Start mrm-bldc4x2.5%i \n\r", deviceNumber); 
+		// robotContainer->print("Start mrm-bldc4x2.5%i \n\r", deviceNumber); 
 		for (uint8_t i = 0; i < 8; i++) { // 8 tries
 			start(deviceNumber, 0);
 			// Wait for 1. message.
 			uint32_t startMs = millis();
 			while (millis() - startMs < 50) {
 				if (millis() - (*_lastReadingMs)[deviceNumber] < 100) {
-					// print("BLDC confirmed\n\r");
+					// robotContainer->print("BLDC confirmed\n\r");
 					return true;
 				}
 				robotContainer->delayMs(1);
@@ -651,24 +651,24 @@ void MotorBoard::test(uint8_t deviceNumber, uint16_t betweenTestsMs)
 	const int8_t step[3] = { 1, -1, 1 };
 
 	// Select motor
-	print("%s - enter motor number [0-%i] or wait for all\n\r", name(), nextFree - 1);
+	robotContainer->print("%s - enter motor number [0-%i] or wait for all\n\r", name(), nextFree - 1);
 	uint16_t selectedMotor = robotContainer->serialReadNumber(3000, 500, nextFree - 1 > 9, nextFree - 1, false);
 	if (selectedMotor == 0xFFFF)
-		print("Test all\n\r");
+		robotContainer->print("Test all\n\r");
 	else
-		print("\n\rTest motor %i\n\r", selectedMotor);
+		robotContainer->print("\n\rTest motor %i\n\r", selectedMotor);
 
 	// Select speed
 	bool fixedSpeed = false;
-	print("Enter speed [0-127] or wait for all\n\r");
+	robotContainer->print("Enter speed [0-127] or wait for all\n\r");
 	uint16_t selectedSpeed = robotContainer->serialReadNumber(2000, 500, false, 127, false);
 	if (selectedSpeed == 0xFFFF) {
 		fixedSpeed = false;
-		print("All speeds\n\r");
+		robotContainer->print("All speeds\n\r");
 	}
 	else {
 		fixedSpeed = true;
-		print("\n\rSpeed %i\n\r", selectedSpeed);
+		robotContainer->print("\n\rSpeed %i\n\r", selectedSpeed);
 	}
 
 	bool goOn = true;
@@ -705,7 +705,7 @@ void MotorBoard::test(uint8_t deviceNumber, uint16_t betweenTestsMs)
 				speedSet(motorNumber, speed);
 
 				if (millis() - lastMs > DISPLAY_PAUSE_MS) {
-					print("Mot. %i:%3i, en: %i\n\r", motorNumber, speed, (*encoderCount)[motorNumber]);
+					robotContainer->print("Mot. %i:%3i, en: %i\n\r", motorNumber, speed, (*encoderCount)[motorNumber]);
 					lastMs = millis();
 				}
 				robotContainer->delayMs(PAUSE_MS);
@@ -737,8 +737,10 @@ void MotorBoard::test(uint8_t deviceNumber, uint16_t betweenTestsMs)
 @param maxNumberOfBoards - maximum number of boards
 @param id - unique id
 */
-SensorBoard::SensorBoard(Robot* robot, uint8_t devicesOnABoard, const char boardName[], uint8_t maxNumberOfBoards, BoardId id) :
+SensorBoard::SensorBoard(Robot* robot, uint8_t devicesOnABoard, const char boardName[], uint8_t maxNumberOfBoards, 
+	BoardId id, uint8_t readingsCount) :
 	Board(robot, maxNumberOfBoards, devicesOnABoard, boardName, SENSOR_BOARD, id) {
+		_readingsCount = readingsCount;
 }
 
 /** Starts periodical CANBus messages that will be refreshing values that mirror sensor's calculated values
@@ -750,14 +752,14 @@ void SensorBoard::continuousReadingCalculatedDataStart(uint8_t deviceNumber) {
 			continuousReadingCalculatedDataStart(i);
 	else {
 		if (alive(deviceNumber)) {
-			//print("Alive, start reading: %s\n\r", name(deviceNumber));
+			//robotContainer->print("Alive, start reading: %s\n\r", name(deviceNumber));
 #if REQUEST_NOTIFICATION // todo
 			notificationRequest(COMMAND_SENSORS_MEASURE_CONTINUOUS_REQUEST_NOTIFICATION, deviceNumber);
 #else
 			canData[0] = COMMAND_SENSORS_MEASURE_CONTINUOUS_AND_RETURN_CALCULATED_DATA;
 			messageSend(canData, 1, deviceNumber);
 			//robotContainer->mrm_can_bus->messageSend((*idIn)[deviceNumber], 1, canData);
-			//print("Sent to 0x%x\n\r, ", (*idIn)[deviceNumber]);
+			//robotContainer->print("Sent to 0x%x\n\r, ", (*idIn)[deviceNumber]);
 #endif
 		}
 	}
@@ -959,7 +961,7 @@ void MotorGroupStar::goToEliminateErrors(float errorX, float errorY, float error
 
 	if (false && millis() - lastMs > 500) {
 		lastMs = millis();
-		//print(" Errors: (%i, %i) %i deg. Sp: %i, rot %i. \n\r", errorX, errorY, heading, speed, rotationToMaintainHeading(headingToMaintain));
+		//robotContainer->print(" Errors: (%i, %i) %i deg. Sp: %i, rot %i. \n\r", errorX, errorY, heading, speed, rotationToMaintainHeading(headingToMaintain));
 	}
 #define SPEED_LIMIT 30
 	go(speed, heading, rotation, SPEED_LIMIT);

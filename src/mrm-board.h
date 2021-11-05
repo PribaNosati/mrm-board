@@ -128,6 +128,11 @@ public:
 	*/
 	bool alive(uint8_t deviceNumber = 0, bool checkAgainIfDead = false, bool errorIfNotAfterCheckingAgain = false);
 
+	/** Detects if there is a gap in CAN Bus addresses' sequence, like 0, 2, 3 (missing 1).
+	@return - is there a gap.
+	*/
+	bool canGap();
+
 	/** Did any device respond to last ping?
 	@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
 	*/
@@ -372,6 +377,26 @@ public:
 class SensorBoard : public Board {
 private:
 	uint8_t _readingsCount; // Number of measurements, like 9 in a reflectance sensors with 9 transistors
+
+protected:
+
+	/** Standard deviation
+	@param sampleCount - count.
+	@param sample - values.
+	@param averageValue - output parameter.
+	@return - standard deviation.*/
+	float stardardDeviation(uint8_t sampleCount, uint16_t sample[], float * averageValue);
+
+	/** Filter out data outliers and return average of the rest
+	@param sampleCount - count.
+	@param sample - values.
+	@param averageValue - average value.
+	@param sigmaCount - number of sigmas to keep.
+	@param standardDeviation - standard deviation.
+	@return average value of the filtered set*/
+	float outlierlessAverage(uint8_t sampleCount, uint16_t sample[], float averageValue, uint8_t sigmaCount,
+		float standardDeviation);
+
 public:
 	/**
 	@param robot - robot containing this board

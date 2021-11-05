@@ -97,16 +97,6 @@ bool Board::alive(uint8_t deviceNumber, bool checkAgainIfDead, bool errorIfNotAf
 	}
 }
 
-/** Did any device respond to last ping?
-@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
-*/
-uint8_t Board::count() {
-	uint8_t cnt = 0;
-	for (uint8_t i = 0; i < nextFree; i++)
-		if (alive(i))
-			cnt++;
-	return cnt;
-}
 
 /** Set aliveness
 @param yesOrNo
@@ -118,6 +108,35 @@ void Board::aliveSet(bool yesOrNo, uint8_t deviceNumber) {
 		return;
 	}
 	_alive = (_alive & ~(1 << deviceNumber)) | (yesOrNo << deviceNumber);
+}
+
+
+/** Detects if there is a gap in CAN Bus addresses' sequence, like 0, 2, 3 (missing 1).
+@return - is there a gap.
+*/
+bool Board::canGap() {
+	bool dead = false;
+	for (uint8_t deviceNumber = 0; deviceNumber < nextFree; deviceNumber++) {
+		if (alive(deviceNumber)){
+			if (dead)
+				return true;
+		}
+		else
+			dead = true;
+
+	}
+	return false;
+}
+
+/** Did any device respond to last ping?
+@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
+*/
+uint8_t Board::count() {
+	uint8_t cnt = 0;
+	for (uint8_t i = 0; i < nextFree; i++)
+		if (alive(i))
+			cnt++;
+	return cnt;
 }
 
 /** Count all the devices, alive or not
@@ -765,7 +784,48 @@ void SensorBoard::continuousReadingCalculatedDataStart(uint8_t deviceNumber) {
 	}
 }
 
+/** Standard deviation
+@param sampleCount - count.
+@param sample - values.
+@param averageValue - output parameter.
+@return - standard deviation.*/
+float SensorBoard::stardardDeviation(uint8_t sampleCount, uint16_t sample[], float * averageValue){
+				// Average and standard deviation
+			float sum = 0.0;
+			for(uint8_t i = 0; i < sampleCount; i++)
+				sum += sample[i];
+			//robotContainer->print("Sum %i\n\r", (int)sum);
+			*averageValue = sum / sampleCount;
+			//robotContainer->print("Mean %i\n\r", (int)mean);
+			float sd = 0.0;
+			for(int i = 0; i < sampleCount; i++) 
+				sd += pow(sample[i] - *averageValue, 2);
+			sd = sqrt(sd / sampleCount);
+			//robotContainer->print("SD %i\n\r", (int)standardDeviation);
+			return sd;
+}
 
+
+/** Filter out data outliers and return average of the rest
+@param sampleCount - count.
+@param sample - values.
+@param averageValue - average value.
+@param sigmaCount - number of sigmas to keep.
+@param standardDeviation - standard deviation.
+@return average value of the filtered set*/
+float SensorBoard::outlierlessAverage(uint8_t sampleCount, uint16_t sample[], float averageValue, uint8_t sigmaCount,
+	float standardDeviation){
+	// Filter out all the values outside n-sigma boundaries and return average value of the rest
+	float sum = 0;
+	uint8_t cnt = 0;
+	for (uint8_t i = 0; i < sampleCount; i++)
+		if (averageValue - sigmaCount * standardDeviation < sample[i] && 
+				sample[i] < averageValue + sigmaCount * standardDeviation){
+			sum += sample[i];
+			cnt++;
+		}
+	return (uint16_t)(sum / cnt);
+}
 
 MotorGroup::MotorGroup(Robot* robot){
 	this->robotContainer = robot;

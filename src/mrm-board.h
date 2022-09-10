@@ -6,6 +6,32 @@
 #include <mrm-pid.h>
 #include <vector>
 
+// Addresses:
+// 0x0110 mrm-bldc2x125
+// 0x0150 mrm-lid-c2, mrm-lid-can-b2
+// 0x0160 mrm-ref-can*
+// 0x0170 mrm-node
+// 0x0180 mrm-lid-c, mrm-lid-can-b
+// 0x0200 mrm-8x8a
+// 0x0210 mrm-therm-b-can
+// 0x0230 mrm-mot4x3.6can
+// 0x0240 mrm-bldc4x2.5
+// 0x0250 mrm-mot4x10
+// 0x0260 mrm-mot2x50
+// 0x0270 mrm-lid-can-b2, mrm-lid-c2
+// 0x0280 mrm-lid-c, mrm-lid-can-b, mrm-therm-l2
+// 0x0290 mrm-ir-finder-can
+// 0x0300 mrm-us
+// 0x0310 mrm-col-can
+// 0x0320 mrm-us-a, mrm-us-u, mrm-us40sg
+// 0x0330 mrm-ir-finder3
+// 0x0350 mrm-fet-can
+// 0x0360 mrm-us-b
+// 0x0370 mrm-us1
+// 0x0380 mrm-col-b
+// 0x0390 mrm-lid-d
+// 0x0400 mrm-lid-d
+
 #define COMMAND_SENSORS_MEASURE_CONTINUOUS 0x10
 #define COMMAND_SENSORS_MEASURE_ONCE 0x11
 #define COMMAND_SENSORS_MEASURE_STOP 0x12
@@ -51,7 +77,7 @@
 #endif
 
 enum BoardId{ID_MRM_8x8A, ID_ANY, ID_MRM_BLDC2X50, ID_MRM_BLDC4x2_5, ID_MRM_COL_B, ID_MRM_COL_CAN, ID_MRM_FET_CAN, ID_MRM_IR_FINDER_2, 
-	ID_MRM_IR_FINDER3, ID_MRM_IR_FINDER_CAN, ID_MRM_LID_CAN_B, ID_MRM_LID_CAN_B2, ID_MRM_MOT2X50, ID_MRM_MOT4X3_6CAN, ID_MRM_MOT4X10, 
+	ID_MRM_IR_FINDER3, ID_MRM_IR_FINDER_CAN, ID_MRM_LID_CAN_B, ID_MRM_LID_CAN_B2, ID_MRM_LID_D, ID_MRM_MOT2X50, ID_MRM_MOT4X3_6CAN, ID_MRM_MOT4X10, 
 	ID_MRM_NODE, ID_MRM_REF_CAN, ID_MRM_SERVO, ID_MRM_SWITCH, ID_MRM_THERM_B_CAN, ID_MRM_US, ID_MRM_US_B, ID_MRM_US1};
 
 enum BoardType{ANY_BOARD, MOTOR_BOARD, SENSOR_BOARD};
@@ -71,7 +97,7 @@ struct BoardInfo{
 */
 class Board{
 protected:
-	uint32_t _alive; // Responded to ping, maximum 32 devices of the same class, stored bitwise.
+	uint32_t _alive; // Responded to ping, maximum 32 devices of the same class, stored bitwise. If bit set, that device was alive after power-on.
 	bool _aliveReport = false;
 	char _boardsName[12];
 	BoardType _boardType; // To differentiate derived boards
@@ -128,6 +154,18 @@ public:
 	*/
 	bool alive(uint8_t deviceNumber = 0, bool checkAgainIfDead = false, bool errorIfNotAfterCheckingAgain = false);
 
+	/** Get aliveness
+	@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
+	@return alive or not
+	*/
+	bool aliveGet(uint8_t deviceNumber = 0);
+
+	/** Set aliveness
+	@param yesOrNo
+	@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
+	*/
+	void aliveSet(bool yesOrNo, uint8_t deviceNumber = 0);
+
 	/** Detects if there is a gap in CAN Bus addresses' sequence, like 0, 2, 3 (missing 1).
 	@return - is there a gap.
 	*/
@@ -137,12 +175,6 @@ public:
 	@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
 	*/
 	uint8_t count();
-
-	/** Set aliveness
-	@param yesOrNo
-	@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
-	*/
-	void aliveSet(bool yesOrNo, uint8_t deviceNumber = 0);
 
 	BoardType boardType(){ return _boardType; }
 
@@ -236,9 +268,10 @@ public:
 	/** Read CAN Bus message into local variables
 	@param canId - CAN Bus id
 	@param data - 8 bytes from CAN Bus message.
+	@param length - number of data bytes
 	@return - true if canId for this class
 	*/
-	virtual bool messageDecode(uint32_t canId, uint8_t data[8]) = 0;
+	virtual bool messageDecode(uint32_t canId, uint8_t data[8], uint8_t length) = 0;
 
 	/** Prints a frame
 	@param msgId - messageId
@@ -257,7 +290,7 @@ public:
 	void messageSend(uint8_t* data, uint8_t dlc, uint8_t deviceNumber = 0);
 
 	/** Returns device's name
-	@param deviceNumber - Motor's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
+	@param deviceNumber - Device's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
 	@return - name
 	*/
 	char *name(uint8_t deviceNumber);
@@ -342,9 +375,10 @@ public:
 	/** Read CAN Bus message into local variables
 	@param canId - CAN Bus id
 	@param data - 8 bytes from CAN Bus message.
+	@param length - number of data bytes
 	@return - true if canId for this class
 	*/
-	bool messageDecode(uint32_t canId, uint8_t data[8]);
+	bool messageDecode(uint32_t canId, uint8_t data[8], uint8_t length);
 
 	/** Encoder readings
 	@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
@@ -417,9 +451,10 @@ public:
 	/** Read CAN Bus message into local variables
 	@param canId - CAN Bus id
 	@param data - 8 bytes from CAN Bus message.
+	@param length - number of data bytes
 	@return - true if canId for this class
 	*/
-	virtual bool messageDecode(uint32_t canId, uint8_t data[8]){return false;}
+	virtual bool messageDecode(uint32_t canId, uint8_t data[8], uint8_t length){return false;}
 
 	/** All readings
 	@param subsensorNumberInSensor - like a single IR transistor in mrm-ref-can

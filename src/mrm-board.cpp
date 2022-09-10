@@ -98,6 +98,15 @@ bool Board::alive(uint8_t deviceNumber, bool checkAgainIfDead, bool errorIfNotAf
 }
 
 
+/** Get aliveness
+@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
+@return alive or not
+*/
+bool Board::aliveGet(uint8_t deviceNumber){
+	return (_alive >> deviceNumber) & 1;
+}
+
+
 /** Set aliveness
 @param yesOrNo
 @param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
@@ -152,12 +161,19 @@ uint8_t Board::deadOrAliveCount() { return nextFree; }
 uint8_t Board::devicesScan(bool verbose, uint16_t mask) {
 	_aliveReport = verbose;
 	for (uint8_t deviceNumber = 0; deviceNumber < nextFree; deviceNumber++) {
-		if ((mask >> deviceNumber) & 1) {
-			aliveSet(false, deviceNumber);
+		if ((mask >> deviceNumber) & 1) { // If in the list requested to be scanned.
+			aliveSet(false, deviceNumber); // Mark as not alive. It will be marked as alive when returned message arrives.
+			int8_t tries = 5;
 			canData[0] = COMMAND_REPORT_ALIVE;
-			messageSend(canData, 1, deviceNumber);
-			// robotContainer->print("%s scanned\n\r", name(deviceNumber));
-			robotContainer->delayMicros(500); // Exchange CAN Bus messages and receive possible answer, that sets _alive. 
+			do{
+				// if (maximumNumberOfBoards == 8) //AAA
+				// 	robotContainer->print("Device: %i\n\r", deviceNumber); //AAA
+				messageSend(canData, 1, deviceNumber);
+				// robotContainer->print("%s scanned\n\r", name(deviceNumber)); //AAA
+				robotContainer->delayMicros(500); // Exchange CAN Bus messages and receive possible answer, that sets _alive. 
+				if (aliveGet(deviceNumber))
+					tries = 0;
+			} while(tries-- > 0);
 		}
 	}
 	//robotContainer->print("%s OVER\n\r", nameGroup);
@@ -348,7 +364,7 @@ bool Board::messagePrint(uint32_t msgId, uint8_t dlc, uint8_t* data, bool outbou
 	bool found = false;
 	for (uint8_t deviceNumber = 0; deviceNumber < nextFree; deviceNumber++)
 		if (isForMe(msgId, deviceNumber) || isFromMe(msgId, deviceNumber)) {
-			robotContainer->print("%s id:%s (0x%02X)", outbound ? "Out" : "In", (*_name)[deviceNumber], msgId);
+			robotContainer->print("%s id:%s (0x%02X)", outbound ? "To" : "From", (*_name)[deviceNumber], msgId);
 			for (uint8_t i = 0; i < dlc; i++) {
 				if (i == 0)
 					robotContainer->print(" data:");
@@ -358,7 +374,7 @@ bool Board::messagePrint(uint32_t msgId, uint8_t dlc, uint8_t* data, bool outbou
 			found = true;
 		}
 	if (!found) {
-		robotContainer->print("%s id:0x%02X", outbound ? "Out" : "In", msgId);
+		robotContainer->print("%s id:0x%02X", outbound ? "To" : "From", msgId);
 		for (uint8_t i = 0; i < dlc; i++) {
 			if (i == 0)
 				robotContainer->print(" data:");
@@ -383,6 +399,16 @@ void Board::messageSend(uint8_t* data, uint8_t dlc, uint8_t deviceNumber) {
 	else {
 		if (robotContainer->sniffing())
 			messagePrint((*idIn)[deviceNumber], dlc, data, true);
+		// if (maximumNumberOfBoards == 8) {//AAA
+		// 	static int cnt = 0;
+		// 	robotContainer->print("Device: %s %i,id: %i, cnt: %i\n\r", name(deviceNumber), deviceNumber,
+		// 		(*idIn)[deviceNumber], cnt);
+		// 	robotContainer->print("Over\n\r");
+		// 	++cnt;
+		// 	delay(500);
+		// 	if (++cnt > 18)
+		// 		return;
+		// }
 		robotContainer->mrm_can_bus->messageSend((*idIn)[deviceNumber], dlc, data);
 	}
 }
@@ -463,7 +489,7 @@ void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refre
 			start(i, measuringModeNow, refreshMs);
 	else {
 		if (alive(deviceNumber)) {
-			//robotContainer->print("Alive, start reading: %s, mode: %i\n\r", _boardsName, measuringModeNow);
+			// robotContainer->print("Alive, start reading: %s, mode: %i\n\r", name(deviceNumber), measuringModeNow);
 #if REQUEST_NOTIFICATION
 			notificationRequest(COMMAND_SENSORS_MEASURE_CONTINUOUS_REQUEST_NOTIFICATION, deviceNumber);
 #else
@@ -478,7 +504,11 @@ void Board::start(uint8_t deviceNumber, uint8_t measuringModeNow, uint16_t refre
 				canData[1] = refreshMs & 0xFF;
 				canData[2] = (refreshMs >> 8) & 0xFF;
 			}
+			// if (maximumNumberOfBoards == 8) //AAA
+			// 	robotContainer->print("In: %i\n\r", deviceNumber);
 			messageSend(canData, refreshMs == 0 ? 1 : 3, deviceNumber);
+			// if (maximumNumberOfBoards == 8)//AAA
+			// 	robotContainer->print("Out: %i\n\r", deviceNumber);
 #endif
 		}
 	}
@@ -547,9 +577,10 @@ void MotorBoard::directionChange(uint8_t deviceNumber) {
 /** Read CAN Bus message into local variables
 @param canId - CAN Bus id
 @param data - 8 bytes from CAN Bus message.
+@param length - number of data bytes
 @return - true if canId for this class
 */
-bool MotorBoard::messageDecode(uint32_t canId, uint8_t data[8]) {
+bool MotorBoard::messageDecode(uint32_t canId, uint8_t data[8], uint8_t length) {
 	for (uint8_t deviceNumber = 0; deviceNumber < nextFree; deviceNumber++)
 		if (isForMe(canId, deviceNumber)) {
 			if (!messageDecodeCommon(canId, data, deviceNumber)) {
@@ -562,7 +593,7 @@ bool MotorBoard::messageDecode(uint32_t canId, uint8_t data[8]) {
 				}
 				default:
 					robotContainer->print("Unknown command. ");
-					messagePrint(canId, 8, data, false);
+					messagePrint(canId, length, data, false);
 					errorCode = 200;
 					errorInDeviceNumber = deviceNumber;
 				}

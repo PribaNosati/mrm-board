@@ -367,6 +367,8 @@ public:
 	*/
 	MotorBoard(Robot* robot, uint8_t devicesOnABoard, const char * boardName, uint8_t maxNumberOfBoards, BoardId id);
 
+	~MotorBoard();
+
 	/** Changes rotation's direction
 	@param deviceNumber - Devices's ordinal number. Each call of function add() assigns a increasing number to the device, starting with 0.
 	*/
